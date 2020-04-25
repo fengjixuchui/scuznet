@@ -25,6 +25,8 @@
 #include "mem.h"
 #include "hdd.h"
 
+#ifdef HDD_ENABLED
+
 /*
  * Defines the standard response we provide when asked to give INQUIRY data.
  */
@@ -226,7 +228,7 @@ static void hdd_read(uint8_t* cmd)
 				 * The byte required by the below call should already be in the
 				 * USART buffer per the contract with the data wait call.
 				 */
-				phy_data_offer_stream(&MEM_USART, 512);
+				phy_data_offer_stream_block(&MEM_USART);
 				for (uint8_t j = 0; j < 2; j++)
 				{
 					MEM_USART.DATA = 0xFF;
@@ -351,7 +353,7 @@ static void hdd_write(uint8_t* cmd)
 			 */
 			while (! (MEM_USART.STATUS & USART_DREIF_bm));
 			MEM_USART.DATA = send_token;
-			phy_data_ask_stream(&MEM_USART, 512);
+			phy_data_ask_stream_block(&MEM_USART);
 
 			// wait for byte sending to stop so RX can be re-synced
 			while (! (MEM_USART.STATUS & USART_TXCIF_bm));
@@ -525,3 +527,5 @@ void hdd_main(void)
 	}
 	logic_done();
 }
+
+#endif /* HDD_ENABLED */

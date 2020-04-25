@@ -39,7 +39,6 @@
  * Set the features that should be compiled into the firmware.
  */
 #define HDD_ENABLED
-#define ENC_ENABLED
 
 /*
  * ****************************************************************************
@@ -51,10 +50,10 @@
  * The VPORT assignments on this device are static, and are likely just for
  * the PHY. Make sure to update later sections if these need to change.
  */
-#define DEV_VPORT0_CFG          PORTCFG_VP02MAP_PORTA_gc
-#define DEV_VPORT1_CFG          PORTCFG_VP13MAP_PORTR_gc
-#define DEV_VPORT2_CFG          PORTCFG_VP02MAP_PORTC_gc
-#define DEV_VPORT3_CFG          PORTCFG_VP13MAP_PORTD_gc
+#define DEV_VPORT0_CFG          PORTCFG_VP02MAP_PORTB_gc
+#define DEV_VPORT1_CFG          PORTCFG_VP13MAP_PORTD_gc
+#define DEV_VPORT2_CFG          PORTCFG_VP02MAP_PORTE_gc
+#define DEV_VPORT3_CFG          PORTCFG_VP13MAP_PORTR_gc
 
 /*
  * ****************************************************************************
@@ -63,30 +62,11 @@
  * 
  * ****************************************************************************
  */
-#define DEBUG_USART             USARTE0
-#define DEBUG_PORT              PORTE
-#define DEBUG_PIN_TX            PIN3_bm
-#define LED_PORT                VPORT3
+#define DEBUG_USART             USARTD1
+#define DEBUG_PORT              PORTD
+#define DEBUG_PIN_TX            PIN7_bm
+#define LED_PORT                VPORT1
 #define LED_PIN                 PIN7_bm
-
-/*
- * ****************************************************************************
- * 
- *   ETHERNET CONTROLLER
- * 
- * ****************************************************************************
- */
-#define ENC_USART               USARTF0
-#define ENC_USART_BAUDCTRL      0
-#define ENC_PORT                PORTF
-#define ENC_PIN_CS              PIN0_bm
-#define ENC_PIN_XCK             PIN1_bm
-#define ENC_PIN_RX              PIN2_bm
-#define ENC_PIN_TX              PIN3_bm
-#define ENC_PIN_RST             PIN4_bm
-#define ENC_PIN_INT             PIN5_bm
-#define ENC_RX_PINCTRL          PORTF.PIN2CTRL
-#define ENC_INT_PINCTRL         PORTF.PIN5CTRL
 
 /*
  * ****************************************************************************
@@ -95,13 +75,13 @@
  * 
  * ****************************************************************************
  */
-#define MEM_USART               USARTE1
-#define MEM_PORT                PORTE
-#define MEM_PIN_CS              PIN4_bm
-#define MEM_PIN_XCK             PIN5_bm
-#define MEM_PIN_RX              PIN6_bm
-#define MEM_PIN_TX              PIN7_bm
-#define MEM_PINCTRL_RX          PORTE.PIN6CTRL
+#define MEM_USART               USARTD0
+#define MEM_PORT                PORTD
+#define MEM_PIN_CS              PIN0_bm
+#define MEM_PIN_XCK             PIN1_bm
+#define MEM_PIN_RX              PIN2_bm
+#define MEM_PIN_TX              PIN3_bm
+#define MEM_PINCTRL_RX          PORTD.PIN2CTRL
 
 /*
  * ****************************************************************************
@@ -110,15 +90,6 @@
  * 
  * ****************************************************************************
  */
-
-/*
- * See config.h for a description of these.
- */
-#define PHY_PORT_DATA_IN_REVERSED
-#define PHY_PORT_DATA_IN_INVERT
-#define PHY_PORT_DATA_IN_CLOCK
-#define PHY_PORT_DATA_IN_OE
-#define PHY_PORT_DATA_IN_ACKEN
 
 /*
  * Pin and port assignments. These end up scattered across a bunch of ports
@@ -131,57 +102,46 @@
  *    trigger.
  * 4) The control input lines for /BSY and /SEL need to be on the same port,
  *    and that port can have no other pin interrupts associated with it.
- * 5) Bitmasks must be set for all pins, and bit positions must be set for
- *    receiving on /ACK and transmitting on /DBP, /REQ.
  */
 #define PHY_PORT_DATA_IN        PORTA
-#define PHY_PORT_DATA_OUT       PORTB
+#define PHY_PORT_DATA_OUT       PORTC
 #define PHY_PORT_R_RST          VPORT2
 #define PHY_PORT_R_BSY          VPORT2
 #define PHY_PORT_R_SEL          VPORT2
-#define PHY_PORT_R_ATN          VPORT2
+#define PHY_PORT_R_ATN          VPORT3
 #define PHY_PORT_R_ACK          VPORT3
-#define PHY_PORT_T_BSY          VPORT3
-#define PHY_PORT_T_SEL          VPORT2
-#define PHY_PORT_T_MSG          VPORT3
-#define PHY_PORT_T_CD           VPORT3
-#define PHY_PORT_T_IO           VPORT3
-#define PHY_PORT_T_REQ          VPORT3
-#define PHY_PORT_T_DBP          VPORT2
-#define PHY_PORT_DOE            VPORT1
-#define PHY_PORT_DCLK           VPORT3
-#define PHY_PORT_ACKEN          VPORT2
-#define PHY_PIN_R_RST           PIN6_bm
-#define PHY_PIN_R_BSY           PIN4_bm
-#define PHY_PIN_R_SEL           PIN3_bm
-#define PHY_PIN_R_ATN           PIN5_bm
-#define PHY_PIN_R_ACK           PIN2_bm
-#define PHY_PIN_R_ACK_BP        PIN2_bp
-#define PHY_PIN_T_BSY           PIN0_bm
-#define PHY_PIN_T_SEL           PIN1_bm
-#define PHY_PIN_T_MSG           PIN5_bm
-#define PHY_PIN_T_CD            PIN3_bm
+#define PHY_PORT_T_BSY          VPORT0
+#define PHY_PORT_T_SEL          VPORT0
+#define PHY_PORT_T_MSG          VPORT2
+#define PHY_PORT_T_CD           VPORT1
+#define PHY_PORT_T_IO           VPORT1
+#define PHY_PORT_T_REQ          VPORT1
+#define PHY_PORT_T_DBP          VPORT0
+#define PHY_PIN_R_RST           PIN1_bm
+#define PHY_PIN_R_BSY           PIN3_bm
+#define PHY_PIN_R_SEL           PIN2_bm
+#define PHY_PIN_R_ATN           PIN1_bm
+#define PHY_PIN_R_ACK           PIN0_bm
+#define PHY_PIN_T_BSY           PIN2_bm
+#define PHY_PIN_T_SEL           PIN0_bm
+#define PHY_PIN_T_MSG           PIN0_bm
+#define PHY_PIN_T_CD            PIN6_bm
 #define PHY_PIN_T_IO            PIN4_bm
-#define PHY_PIN_T_REQ           PIN6_bm
-#define PHY_PIN_T_REQ_BP        PIN6_bp
-#define PHY_PIN_T_DBP           PIN0_bm
-#define PHY_PIN_T_DBP_BP        PIN0_bp
-#define PHY_PIN_DOE             PIN0_bm
-#define PHY_PIN_DCLK            PIN1_bm
-#define PHY_PIN_ACKEN           PIN7_bm
+#define PHY_PIN_T_REQ           PIN5_bm
+#define PHY_PIN_T_DBP           PIN1_bm
 // a few need pin configs as well
-#define PHY_CFG_R_SEL           PORTC.PIN1CTRL
-#define PHY_CFG_R_BSY           PORTC.PIN4CTRL
-#define PHY_CFG_R_RST           PORTC.PIN6CTRL
+#define PHY_CFG_R_SEL           PORTE.PIN2CTRL
+#define PHY_CFG_R_BSY           PORTE.PIN3CTRL
+#define PHY_CFG_R_RST           PORTE.PIN1CTRL
 // and event channel information
-#define PHY_CHMUX_RST           EVSYS_CHMUX_PORTC_PIN6_gc
-#define PHY_CHMUX_BSY           EVSYS_CHMUX_PORTC_PIN4_gc
+#define PHY_CHMUX_RST           EVSYS_CHMUX_PORTE_PIN1_gc
+#define PHY_CHMUX_BSY           EVSYS_CHMUX_PORTE_PIN3_gc
 
 /*
  * Interrupt information for the port containing the /BSY and /SEL in lines.
  */
-#define PHY_PORT_CTRL_IN        PORTC
-#define PHY_CTRL_IN_INT0_vect   PORTC_INT0_vect
-#define PHY_CTRL_IN_INT1_vect   PORTC_INT1_vect
+#define PHY_PORT_CTRL_IN        PORTE
+#define PHY_CTRL_IN_INT0_vect   PORTE_INT0_vect
+#define PHY_CTRL_IN_INT1_vect   PORTE_INT1_vect
 
 #endif /* HARDWARE_H */

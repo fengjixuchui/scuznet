@@ -141,10 +141,11 @@
 
 /*
  * Lookup values needed to swap a reversed port order back to normal, or take
- * a normal value and reverse it. These are in SRAM to improve performance.
+ * a normal value and reverse it. These are in SRAM to improve performance,
+ * aligned for faster lookups (in theory).
  */
 #ifdef PHY_PORT_DATA_IN_REVERSED
-static uint8_t phy_reverse_table[256] = {
+static uint8_t phy_reverse_table[256] __attribute__ ((aligned (256))) = {
 	0, 128, 64, 192, 32, 160, 96, 224, 16, 144, 80, 208, 48, 176, 112, 240, 8, 
 	136, 72, 200, 40, 168, 104, 232, 24, 152, 88, 216, 56, 184, 120, 248, 4, 
 	132, 68, 196, 36, 164, 100, 228, 20, 148, 84, 212, 52, 180, 116, 244, 12, 
@@ -168,9 +169,9 @@ static uint8_t phy_reverse_table[256] = {
  * Truth table for parity calculations when outputting data, and for checking
  * the number of bits set in a byte more generally (we should probably begin
  * checking that when responding to selection). As with the above array, these
- * are stored in SRAM for improved performance.
+ * are stored in SRAM aligned to a 256 byte boundry for improved performance. 
  */
-static uint8_t phy_bits_set[256] = {
+static uint8_t phy_bits_set[256] __attribute__ ((aligned (256))) = {
 	0, 1, 1, 2, 1, 2, 2, 3, 1, 2, 2, 3, 2, 3, 3, 4, 1, 2, 2, 3, 2, 3, 3, 4, 2, 
 	3, 3, 4, 3, 4, 4, 5, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 4, 3, 4, 4, 5, 2, 3, 
 	3, 4, 3, 4, 4, 5, 3, 4, 4, 5, 4, 5, 5, 6, 1, 2, 2, 3, 2, 3, 3, 4, 2, 3, 3, 
@@ -252,11 +253,8 @@ static inline __attribute__((always_inline)) void phy_data_set(uint8_t data)
 {
 	if (GLOBAL_CONFIG_REGISTER & GLOBAL_FLAG_PARITY)
 	{
-		if (phy_bits_set[data] & 1)
-		{
-			dbp_release();
-		}
-		else
+		dbp_release();
+		if (! (phy_bits_set[data] & 1))
 		{
 			dbp_assert();
 		}
@@ -468,6 +466,90 @@ void phy_data_offer_stream(USART_t* usart, uint16_t len)
 	}
 }
 
+void phy_data_offer_stream_block(USART_t* usart)
+{
+	if (! (PHY_REGISTER_PHASE & 0x01)) return;
+	if (! phy_is_active()) return;
+
+	// verify a byte is actually waiting
+	while (! (usart->STATUS & USART_RXCIF_bm));
+
+	/*
+	 * A brute-force approach for speed in card transfers. This is in assembly
+	 * to achieve a few things:
+	 * 
+	 * 1) Ensure that the operation takes at least 16 cycles to allow us to
+	 *    skip the RXCIF check safely,
+	 * 2) Optimize the parity array, which is at a byte boundry, to allow 
+	 *    the low byte of the X pointer to be used both for data storage and as
+	 *    the direct lookup address into SRAM to get the parity data,
+	 * 3) Force usage of the Y pointer for the data output operation, and
+	 * 4) Give manual control over the degree of loop unrolling.
+	 * 
+	 * This is dependent on a few things being set elsewhere:
+	 * 
+	 * 1) The card USART must be operating at full speed, 16 CPU cycles/byte.
+	 * 2) The bits-set array must be aligned to a 256 byte boundary.
+	 * 
+	 * This feels more than a little hacky, so if anyone has any insight on
+	 * ways to force GCC to do these things in C I'm all ears.
+	 */
+
+	// a hideous macro approaches
+	#define REP64(x) x x x x x x x x x x \
+			x x x x x x x x x x \
+			x x x x x x x x x x \
+			x x x x x x x x x x \
+			x x x x x x x x x x \
+			x x x x x x x x x x \
+			x x x x
+	#define REP512(x) REP64(x) REP64(x) REP64(x) REP64(x) \
+			REP64(x) REP64(x) REP64(x) REP64(x)
+
+	uint8_t max = 0xFF;
+	__asm__ __volatile__(
+			// fetch the pending value
+REP512(		"st Z, %0"					"\n\t"	// send 0xFF to card
+			"ld XL, Z"					"\n\t"	// fetch card data to XL
+
+			// loop until /ACK is released
+	"1:"	"sbic %6, %7"				"\n\t"
+			"rjmp 1b"					"\n\t"
+
+			// output data to /DB0-7
+			"st Y, XL"					"\n\t"
+
+			// handle /DBP
+			"cbi %2, %3"				"\n\t"	// release /DBP
+			"ld __tmp_reg__, X"			"\n\t"	// fetch parity data value
+			"sbrs __tmp_reg__, 0"		"\n\t"	// skip next if odd
+			"sbi %2, %3"				"\n\t"	//   assert /DBP
+			"nop"						"\n\t"	// skew delay
+
+			// assert /REQ
+			"sbi %4, %5"				"\n\t"
+			"nop"						"\n\t"	// this adds 100kB/s on my
+												// system: hitting SBIS is
+												// expensive!
+
+			// loop until /ACK is asserted
+	"2:"	"sbis %6, %7"				"\n\t"
+			"rjmp 2b"					"\n\t"
+
+			// release /REQ
+			"cbi %4, %5"				"\n\t") /* end REP */
+
+			: // no output operands
+			: "r" (max), "X" (&(PHY_PORT_DATA_OUT.OUT)),
+			"I" (&(PHY_PORT_T_DBP.OUT)), "I" (PHY_PIN_T_DBP_BP),
+			"I" (&(PHY_PORT_T_REQ.OUT)), "I" (PHY_PIN_T_REQ_BP),
+			"I" (&(PHY_PORT_R_ACK.IN)), "I" (PHY_PIN_R_ACK_BP),
+			"x" (&phy_bits_set), "z" (&(usart->DATA)),
+			"y" (&(PHY_PORT_DATA_OUT.OUT))
+			: // no clobbers
+			);
+}
+
 void phy_data_offer_stream_atn(USART_t* usart, uint16_t len)
 {
 	uint8_t v;
@@ -571,6 +653,43 @@ void phy_data_ask_stream(USART_t* usart, uint16_t len)
 		while (! (usart->STATUS & USART_DREIF_bm));
 		usart->DATA = v;
 	}
+}
+
+void phy_data_ask_stream_block(USART_t* usart)
+{
+	uint8_t v;
+
+	if (! phy_is_active()) return;
+
+	uint8_t i = 255;
+	do
+	{
+		while (phy_is_ack_asserted());
+		req_assert();
+		while (! (phy_is_ack_asserted()));
+		v = phy_data_get();
+		req_release();
+		#ifdef PHY_PORT_DATA_IN_REVERSED
+			v = phy_reverse_table[v];
+		#endif
+		while (! (usart->STATUS & USART_DREIF_bm));
+		usart->DATA = v;
+	}
+	while (i--);
+	do
+	{
+		while (phy_is_ack_asserted());
+		req_assert();
+		while (! (phy_is_ack_asserted()));
+		v = phy_data_get();
+		req_release();
+		#ifdef PHY_PORT_DATA_IN_REVERSED
+			v = phy_reverse_table[v];
+		#endif
+		while (! (usart->STATUS & USART_DREIF_bm));
+		usart->DATA = v;
+	}
+	while (i--);
 }
 
 void phy_phase(uint8_t new_phase)
